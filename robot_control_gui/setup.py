@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'robot_control_gui = robot_control_gui.robot_control_gui:main',
+            'robot_control_gui2 = robot_control_gui.robot_control_gui2:main',
         ],
     },
 )
