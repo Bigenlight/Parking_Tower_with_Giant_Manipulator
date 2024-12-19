@@ -1,0 +1,3 @@
+[console_scripts]
+robot_control_gui = robot_control_gui.robot_control_gui:main
+

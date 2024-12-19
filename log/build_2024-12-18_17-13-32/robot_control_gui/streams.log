@@ -1,0 +1,37 @@
+[0.792s] Invoking command in '/home/rokey/7_ws/src/robot_control_gui': PYTHONPATH=/home/rokey/7_ws/src/build/robot_control_gui/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/rokey/7_ws/src/install/robot_control_gui/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/robot_control_gui build --build-base /home/rokey/7_ws/src/build/robot_control_gui/build install --record /home/rokey/7_ws/src/build/robot_control_gui/install.log --single-version-externally-managed install_data
+[1.073s] running egg_info
+[1.073s] creating ../build/robot_control_gui/robot_control_gui.egg-info
+[1.074s] writing ../build/robot_control_gui/robot_control_gui.egg-info/PKG-INFO
+[1.074s] writing dependency_links to ../build/robot_control_gui/robot_control_gui.egg-info/dependency_links.txt
+[1.074s] writing entry points to ../build/robot_control_gui/robot_control_gui.egg-info/entry_points.txt
+[1.075s] writing requirements to ../build/robot_control_gui/robot_control_gui.egg-info/requires.txt
+[1.075s] writing top-level names to ../build/robot_control_gui/robot_control_gui.egg-info/top_level.txt
+[1.075s] writing manifest file '../build/robot_control_gui/robot_control_gui.egg-info/SOURCES.txt'
+[1.077s] reading manifest file '../build/robot_control_gui/robot_control_gui.egg-info/SOURCES.txt'
+[1.077s] writing manifest file '../build/robot_control_gui/robot_control_gui.egg-info/SOURCES.txt'
+[1.078s] running build
+[1.078s] running build_py
+[1.078s] creating /home/rokey/7_ws/src/build/robot_control_gui/build
+[1.078s] creating /home/rokey/7_ws/src/build/robot_control_gui/build/lib
+[1.078s] creating /home/rokey/7_ws/src/build/robot_control_gui/build/lib/robot_control_gui
+[1.078s] copying robot_control_gui/robot_control_gui.py -> /home/rokey/7_ws/src/build/robot_control_gui/build/lib/robot_control_gui
+[1.078s] copying robot_control_gui/__init__.py -> /home/rokey/7_ws/src/build/robot_control_gui/build/lib/robot_control_gui
+[1.078s] running install
+[1.078s] running install_lib
+[1.079s] creating /home/rokey/7_ws/src/install/robot_control_gui/lib/python3.10/site-packages/robot_control_gui
+[1.079s] copying /home/rokey/7_ws/src/build/robot_control_gui/build/lib/robot_control_gui/robot_control_gui.py -> /home/rokey/7_ws/src/install/robot_control_gui/lib/python3.10/site-packages/robot_control_gui
+[1.079s] copying /home/rokey/7_ws/src/build/robot_control_gui/build/lib/robot_control_gui/__init__.py -> /home/rokey/7_ws/src/install/robot_control_gui/lib/python3.10/site-packages/robot_control_gui
+[1.080s] byte-compiling /home/rokey/7_ws/src/install/robot_control_gui/lib/python3.10/site-packages/robot_control_gui/robot_control_gui.py to robot_control_gui.cpython-310.pyc
+[1.082s] byte-compiling /home/rokey/7_ws/src/install/robot_control_gui/lib/python3.10/site-packages/robot_control_gui/__init__.py to __init__.cpython-310.pyc
+[1.082s] running install_data
+[1.082s] creating /home/rokey/7_ws/src/install/robot_control_gui/share/ament_index
+[1.082s] creating /home/rokey/7_ws/src/install/robot_control_gui/share/ament_index/resource_index
+[1.082s] creating /home/rokey/7_ws/src/install/robot_control_gui/share/ament_index/resource_index/packages
+[1.082s] copying resource/robot_control_gui -> /home/rokey/7_ws/src/install/robot_control_gui/share/ament_index/resource_index/packages
+[1.082s] copying package.xml -> /home/rokey/7_ws/src/install/robot_control_gui/share/robot_control_gui
+[1.083s] running install_egg_info
+[1.084s] Copying ../build/robot_control_gui/robot_control_gui.egg-info to /home/rokey/7_ws/src/install/robot_control_gui/lib/python3.10/site-packages/robot_control_gui-0.0.1-py3.10.egg-info
+[1.085s] running install_scripts
+[1.106s] Installing robot_control_gui script to /home/rokey/7_ws/src/install/robot_control_gui/lib/robot_control_gui
+[1.106s] writing list of installed files to '/home/rokey/7_ws/src/build/robot_control_gui/install.log'
+[1.130s] Invoked command in '/home/rokey/7_ws/src/robot_control_gui' returned '0': PYTHONPATH=/home/rokey/7_ws/src/build/robot_control_gui/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/rokey/7_ws/src/install/robot_control_gui/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/robot_control_gui build --build-base /home/rokey/7_ws/src/build/robot_control_gui/build install --record /home/rokey/7_ws/src/build/robot_control_gui/install.log --single-version-externally-managed install_data
