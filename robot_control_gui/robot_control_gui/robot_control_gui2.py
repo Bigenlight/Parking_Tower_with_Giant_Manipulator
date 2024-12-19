@@ -15,10 +15,10 @@ from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QGraphicsView, QGraphicsScene, QMessageBox, QMainWindow
+    QGraphicsView, QGraphicsScene, QMessageBox, QMainWindow, QSizePolicy  # QSizePolicy 추가
 )
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer, QRectF
-from PyQt5.QtGui import QPixmap, QPen, QBrush, QColor, QPainter, QImage
+from PyQt5.QtGui import QPixmap, QPen, QBrush, QColor, QPainter, QImage, QFont
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import Odometry  # Odometry 메시지 임포트
 from sensor_msgs.msg import Image  # Image 메시지 임포트
@@ -154,7 +154,7 @@ class MapWindow(QMainWindow):
         self.node = node
         self.robots = robots  # list of robot dicts
         self.setWindowTitle("로봇 제어 GUI")
-        self.setGeometry(100, 100, 1600, 800)  # 초기 창 크기 설정 (넓이를 늘림)
+        self.setGeometry(100, 100, 1200, 800)  # 초기 창 크기 조정 (폭 줄임)
 
         # 메인 위젯 설정
         self.main_widget = QWidget()
@@ -163,16 +163,20 @@ class MapWindow(QMainWindow):
 
         # 카메라 이미지 표시를 위한 세로 레이아웃
         self.camera_layout = QVBoxLayout()
+        self.camera_layout.setSpacing(10)  # 레이아웃 간격 조정
+        self.camera_layout.setContentsMargins(10, 10, 10, 10)  # 여백 조정
 
         self.camera_labels = {}
         for robot in self.robots:
+            # 로봇 이름 레이블 설정
             label = QLabel(f"{robot['name']}")
             label.setAlignment(Qt.AlignCenter)
-            label.setStyleSheet("font-weight: bold;")
+            label.setStyleSheet("font-weight: bold; font-size: 12px;")  # 폰트 크기 축소
             self.camera_layout.addWidget(label)
 
+            # 카메라 이미지 레이블 설정
             camera_label = QLabel()
-            camera_label.setFixedSize(320, 240)  # 카메라 이미지 크기 설정
+            camera_label.setFixedSize(400, 300)  # 카메라 이미지 크기 확대 (320x240 -> 400x300)
             camera_label.setStyleSheet("background-color: black;")
             camera_label.setAlignment(Qt.AlignCenter)
             self.camera_layout.addWidget(camera_label)
@@ -186,6 +190,7 @@ class MapWindow(QMainWindow):
         self.map_view.setRenderHint(QPainter.Antialiasing)
         self.map_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 가로 스크롤바 제거
         self.map_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)    # 세로 스크롤바 제거
+        self.map_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 동적 크기 조정
 
         # 지도 로드 (map.yaml과 map.pgm 사용)
         self.load_map("/home/rokey/7_ws/src/robot_control_gui/maps/map.yaml")  # 실제 지도 yaml 경로로 변경
@@ -203,7 +208,7 @@ class MapWindow(QMainWindow):
 
         # 메인 레이아웃에 카메라 이미지와 맵 추가
         self.main_layout.addLayout(self.camera_layout)
-        self.main_layout.addWidget(self.map_view)
+        self.main_layout.addWidget(self.map_view, stretch=1)  # 맵에 더 많은 공간 할당
 
         # 로봇 위치 업데이트를 위한 타이머 설정 (100ms마다)
         self.timer = QTimer()
@@ -267,16 +272,15 @@ class MapWindow(QMainWindow):
         # QRect을 QRectF로 변환하여 전달
         self.map_scene.setSceneRect(QRectF(scaled_pixmap.rect()))
 
-        # 로봇 아이콘 다시 추가 (축소된 맵에 맞게 위치 조정)
-        # Already added above
+        # 로봇 아이콘 다시 추가 (이미 추가됨)
 
         self.map_loaded = True
 
         # 맵 이미지 크기 축소하여 GUI 창에 맞게 표시
         self.map_view.fitInView(self.map_scene.sceneRect(), Qt.KeepAspectRatio)
 
-        # QGraphicsView의 크기를 축소된 맵 이미지 크기에 맞게 고정하여 스크롤바가 생기지 않도록 설정
-        self.map_view.setFixedSize(scaled_pixmap.width(), scaled_pixmap.height())
+        # QGraphicsView의 크기 고정 해제하여 동적 크기 조정 가능
+        # self.map_view.setFixedSize(scaled_pixmap.width(), scaled_pixmap.height())  # 제거
 
         self.node.get_logger().info(f"맵 로드 완료: {map_image_path}")
         self.node.get_logger().info(f"해상도: {resolution} m/pixel, 원점: {origin}")
@@ -303,11 +307,25 @@ class MapWindow(QMainWindow):
         self.node.get_logger().info(f"Map clicked at: real_x={real_x:.2f}, real_y={real_y:.2f}")
         QMessageBox.information(self, "목표 설정", f"목표 위치가 설정되었습니다: ({real_x:.2f}, {real_y:.2f})")
 
-        # 목표 위치로 네비게이션 목표 전송
-        goal_position = (real_x, real_y, 0.0)  # z는 평면상의 위치로 설정
+        # 가장 가까운 로봇에게 목표 설정
+        closest_robot = None
+        min_distance = float('inf')
+        for robot in self.robots:
+            robot_name = robot['name']
+            if self.node.current_pose[robot_name]:
+                robot_x = self.node.current_pose[robot_name].position.x
+                robot_y = self.node.current_pose[robot_name].position.y
+                distance = np.hypot(real_x - robot_x, real_y - robot_y)
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_robot = robot_name
 
-        # 선택한 로봇에게 목표 설정 (여기서는 tb1)
-        self.node.send_navigate_goal_to_position(goal_position, 'tb1')
+        if closest_robot:
+            self.node.send_navigate_goal_to_position((real_x, real_y, 0.0), closest_robot)
+            self.node.get_logger().info(f"목표를 로봇 {closest_robot}에 설정했습니다.")
+        else:
+            self.node.get_logger().warn("현재 로봇 위치를 알 수 없어 목표를 설정할 수 없습니다.")
+            QMessageBox.warning(self, "경고", "현재 로봇 위치를 알 수 없어 목표를 설정할 수 없습니다.")
 
     def update_robot_position(self):
         for robot in self.robots:
