@@ -11,9 +11,16 @@ import os
 import yaml  # YAML 파일을 읽기 위한 패키지 추가
 import rclpy
 from rclpy.node import Node
-# NavigateToPose 및 ActionClient 관련 임포트 제거
-# from nav2_msgs.action import NavigateToPose
-# from rclpy.action import ActionClient
+from std_msgs.msg import String, Int32
+from geometry_msgs.msg import Pose, Twist
+from nav_msgs.msg import Odometry  # Odometry 메시지 임포트
+from sensor_msgs.msg import Image  # Image 메시지 임포트
+from cv_bridge import CvBridge  # cv_bridge 임포트
+from collections import deque
+import numpy as np  # numpy 임포트
+import cv2  # OpenCV 임포트
+import time
+
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QGraphicsView, QGraphicsScene, QMessageBox, QMainWindow, QSizePolicy,
@@ -21,12 +28,6 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QTimer, QRectF
 from PyQt5.QtGui import QPixmap, QPen, QBrush, QColor, QPainter, QImage, QFont
-from geometry_msgs.msg import Pose
-from nav_msgs.msg import Odometry  # Odometry 메시지 임포트
-from sensor_msgs.msg import Image  # Image 메시지 임포트
-from cv_bridge import CvBridge  # cv_bridge 임포트
-import numpy as np  # numpy 임포트
-import cv2  # OpenCV 임포트
 
 class ImageSignal(QObject):
     image_signal = pyqtSignal(str, QImage)  # robot_name and QImage
@@ -37,6 +38,9 @@ class RobotControlNode(Node):
         self.image_signal = image_signal
         self.robots = robots  # 로봇 딕셔너리 리스트
         self.bridge = CvBridge()  # CvBridge 인스턴스 생성
+
+        # `/destination` 토픽에 발행할 퍼블리셔 생성
+        self.destination_pub = self.create_publisher(Int32, '/destination', 10)
 
         # 로봇의 현재 위치 저장 변수 (dict)
         self.current_pose = {robot['name']: None for robot in self.robots}
@@ -84,13 +88,189 @@ class RobotControlNode(Node):
                 self.get_logger().error(f"이미지 변환 오류 for {robot_name}: {e}")
         return image_callback
 
+    def publish_destination(self, destination):
+        msg = Int32()
+        msg.data = destination
+        self.destination_pub.publish(msg)
+        self.get_logger().info(f"Destination published: {destination}")
+
     def close(self):
         pass  # 필요한 종료 작업이 있다면 추가
 
+class ControlNode(Node):
+    def __init__(self):
+        super().__init__('control_node')
+
+        # 구독자 설정
+        self.turtlebot_sub = self.create_subscription(
+            String,
+            '/turtlebot_state',
+            self.turtlebot_state_callback,
+            10
+        )
+        self.arm_sub = self.create_subscription(
+            String,
+            '/arm_state',
+            self.arm_state_callback,
+            10
+        )
+        self.destination_sub = self.create_subscription(
+            Int32,
+            '/destination',
+            self.destination_callback,
+            10
+        )
+
+        # 발행자 설정
+        self.tb1_cmd_vel_pub = self.create_publisher(Twist, '/tb1/cmd_vel', 10)
+        self.tb2_cmd_vel_pub = self.create_publisher(Twist, '/tb2/cmd_vel', 10)
+        self.arm_command_pub = self.create_publisher(String, '/arm_commands', 10)
+
+        # 상태 변수 초기화
+        self.tb1_arrived = False
+        self.tb2_arrived = False
+        self.arm_at_port = False
+        self.arm_busy = False  # Arm이 작업 중인지 여부
+
+        # TurtleBot 큐 (우선순위: tb1 먼저)
+        self.tb_queue = deque()
+
+        # 현재 작업 중인 TurtleBot
+        self.current_tb = None
+
+        # 목적지 번호
+        self.destination = 1
+        self.max_destination = 9
+
+        # 상태
+        self.state = 'IDLE'  # 초기 상태
+
+        self.get_logger().info('Control Node Initialized.')
+
+    def turtlebot_state_callback(self, msg):
+        self.get_logger().info(f'Received turtlebot_state: "{msg.data}"')
+        if msg.data == 'tb1 arrived':
+            if not self.tb1_arrived:
+                self.tb1_arrived = True
+                self.add_to_queue('tb1')
+        elif msg.data == 'tb2 arrived':
+            if not self.tb2_arrived:
+                self.tb2_arrived = True
+                self.add_to_queue('tb2')
+        self.process_queue()
+
+    def arm_state_callback(self, msg):
+        self.get_logger().info(f'Received arm_state: "{msg.data}"')
+        if msg.data == 'port arrived':
+            self.handle_arm_arrival_at_port()
+        elif msg.data == 'tower arrived':
+            self.handle_arm_at_tower()
+
+    def destination_callback(self, msg):
+        self.get_logger().info(f'Received destination: {msg.data}')
+        self.destination = msg.data
+        self.process_queue()
+
+    def add_to_queue(self, tb):
+        # 큐에 TurtleBot 추가 (tb1 우선)
+        if tb not in self.tb_queue:
+            if tb == 'tb1':
+                # tb1이면 큐 앞에 추가
+                self.tb_queue.appendleft(tb)
+            else:
+                # tb2는 뒤에 추가
+                self.tb_queue.append(tb)
+            self.get_logger().info(f'Added {tb} to the queue.')
+
+    def process_queue(self):
+        if self.state == 'IDLE' and self.arm_at_port and not self.arm_busy and self.tb_queue:
+            self.current_tb = self.tb_queue.popleft()
+            self.get_logger().info(f'Starting processing of {self.current_tb}.')
+            self.state = 'MOVE_TB_FORWARD'
+            self.move_turtlebot(self.current_tb, linear_x=0.3, duration=5)
+
+    def move_turtlebot(self, tb, linear_x, duration):
+        twist = Twist()
+        twist.linear.x = linear_x
+        twist.angular.z = 0.0
+
+        publisher = self.tb1_cmd_vel_pub if tb == 'tb1' else self.tb2_cmd_vel_pub
+        direction = "forward" if linear_x > 0 else "backward"
+        self.get_logger().info(f'Moving {tb} {direction} with linear.x = {linear_x} for {duration} seconds.')
+
+        # 10Hz로 duration만큼 publish
+        iterations = int(duration * 10)
+        for _ in range(iterations):
+            publisher.publish(twist)
+            time.sleep(0.1)  # spin_once 제거, 단순 대기
+
+        # 정지 명령 발행
+        twist.linear.x = 0.0
+        publisher.publish(twist)
+        self.get_logger().info(f'{tb} stopped moving.')
+
+        if linear_x > 0:
+            # 앞으로 이동한 경우 Robot Arm에 'on board' 명령 발행
+            self.state = 'ARM_ON_BOARD'
+            self.arm_busy = True
+            self.publish_arm_command(f'on board {self.destination}')
+        elif linear_x < 0:
+            # 후진한 경우 Robot Arm에 'empty' 명령 발행
+            self.state = 'ARM_EMPTY'
+            self.arm_busy = True
+            self.publish_arm_command('empty')
+        
+    def publish_arm_command(self, command):
+        msg = String()
+        msg.data = command
+        self.arm_command_pub.publish(msg)
+        self.get_logger().info(f'Published to /arm_commands: "{command}"')
+
+    def handle_arm_at_tower(self):
+        if self.state == 'ARM_ON_BOARD':
+            # Robot Arm이 목적지에 도착한 경우 TurtleBot을 후진시킴
+            self.get_logger().info(f'Handling arm at tower for {self.current_tb}.')
+            self.state = 'MOVE_TB_BACKWARD'
+            self.move_turtlebot(self.current_tb, linear_x=-0.3, duration=5)
+        elif self.state == 'ARM_EMPTY':
+            # Robot Arm이 'empty' 상태에서 선착장으로 이동
+            self.get_logger().info('Handling arm empty state.')
+            self.state = 'ARM_MOVE_TO_PORT'
+            self.publish_arm_command('move_to_port')
+
+    def handle_arm_arrival_at_port(self):
+        self.arm_at_port = True
+        self.arm_busy = False
+        self.get_logger().info('Robot arm has arrived back at the port.')
+        self.state = 'IDLE'
+        self.process_queue()
+
+    def run(self):
+        # 메인 루프
+        while rclpy.ok():
+            rclpy.spin_once(self, timeout_sec=0.1)
+            # 상태에 따른 추가 처리
+            if self.state == 'ARM_ON_BOARD':
+                # Robot Arm이 목적지로 이동 중이므로 대기
+                pass
+            elif self.state == 'ARM_MOVE_TO_PORT':
+                # Robot Arm이 선착장으로 이동 중이므로 대기
+                pass
+            elif self.state == 'MOVE_TB_BACKWARD':
+                # TurtleBot을 후진시킨 후 Robot Arm을 비움
+                # 'empty' 명령 발행 후 arm_state_callback에서 처리
+                pass
+            elif self.state == 'ARM_EMPTY':
+                # 이미 handle_arm_at_tower에서 처리됨
+                pass
+            elif self.state == 'IDLE':
+                # 모든 작업 완료, 대기 상태
+                pass
+
 class MapWindow(QMainWindow):
-    def __init__(self, node, robots):
+    def __init__(self, robot_control_node, robots):
         super().__init__()
-        self.node = node
+        self.robot_control_node = robot_control_node
         self.robots = robots  # 로봇 딕셔너리 리스트
         self.setWindowTitle("로봇 제어 GUI")
         self.setGeometry(100, 100, 1600, 800)  # 창 크기 조정 (폭 늘림)
@@ -162,7 +342,7 @@ class MapWindow(QMainWindow):
                 button.setStyleSheet("background-color: yellow")
                 button.setChecked(True)
                 self.destination = button_number
-                print(f"Destination set to: {self.destination}")
+                self.robot_control_node.publish_destination(self.destination)
             else:
                 button.setStyleSheet("")
                 button.setChecked(False)
@@ -185,11 +365,11 @@ class MapWindow(QMainWindow):
         self.timer.start(100)  # 100ms
 
         # ImageSignal 연결
-        self.node.image_signal.image_signal.connect(self.update_camera_image)
+        self.robot_control_node.image_signal.image_signal.connect(self.update_camera_image)
 
     def load_map(self, map_yaml_path):
         if not os.path.exists(map_yaml_path):
-            self.node.get_logger().error(f"지도 yaml 파일을 찾을 수 없습니다: {map_yaml_path}")
+            self.robot_control_node.get_logger().error(f"지도 yaml 파일을 찾을 수 없습니다: {map_yaml_path}")
             QMessageBox.critical(self, "오류", f"지도 yaml 파일을 찾을 수 없습니다: {map_yaml_path}")
             return
 
@@ -198,7 +378,7 @@ class MapWindow(QMainWindow):
             try:
                 map_data = yaml.safe_load(file)
             except yaml.YAMLError as exc:
-                self.node.get_logger().error(f"지도 yaml 파일 읽기 오류: {exc}")
+                self.robot_control_node.get_logger().error(f"지도 yaml 파일 읽기 오류: {exc}")
                 QMessageBox.critical(self, "오류", f"지도 yaml 파일 읽기 오류: {exc}")
                 return
 
@@ -215,13 +395,13 @@ class MapWindow(QMainWindow):
         self.map_origin = (origin[0], origin[1])
 
         if not os.path.exists(map_image_path):
-            self.node.get_logger().error(f"지도 이미지 파일을 찾을 수 없습니다: {map_image_path}")
+            self.robot_control_node.get_logger().error(f"지도 이미지 파일을 찾을 수 없습니다: {map_image_path}")
             QMessageBox.critical(self, "오류", f"지도 이미지 파일을 찾을 수 없습니다: {map_image_path}")
             return
 
         pixmap = QPixmap(map_image_path)
         if pixmap.isNull():
-            self.node.get_logger().error(f"지도 이미지 로드 실패: {map_image_path}")
+            self.robot_control_node.get_logger().error(f"지도 이미지 로드 실패: {map_image_path}")
             QMessageBox.critical(self, "오류", f"지도 이미지 로드 실패: {map_image_path}")
             return
 
@@ -251,9 +431,9 @@ class MapWindow(QMainWindow):
         # QGraphicsView의 크기 고정 해제하여 동적 크기 조정 가능
         # self.map_view.setFixedSize(scaled_pixmap.width(), scaled_pixmap.height())  # 제거
 
-        self.node.get_logger().info(f"맵 로드 완료: {map_image_path}")
-        self.node.get_logger().info(f"해상도: {resolution} m/pixel, 원점: {origin}")
-        self.node.get_logger().info(f"맵 스케일: {self.map_scale} 픽셀/meter, 맵 원점: {self.map_origin}")
+        self.robot_control_node.get_logger().info(f"맵 로드 완료: {map_image_path}")
+        self.robot_control_node.get_logger().info(f"해상도: {resolution} m/pixel, 원점: {origin}")
+        self.robot_control_node.get_logger().info(f"맵 스케일: {self.map_scale} 픽셀/meter, 맵 원점: {self.map_origin}")
 
     def handle_button_click(self):
         clicked_button = self.sender()
@@ -262,6 +442,7 @@ class MapWindow(QMainWindow):
                 if button == clicked_button:
                     button.setStyleSheet("background-color: yellow")
                     self.destination = int(button.text())
+                    self.robot_control_node.publish_destination(self.destination)
                     print(f"Destination set to: {self.destination}")
                 else:
                     button.setStyleSheet("")
@@ -273,9 +454,9 @@ class MapWindow(QMainWindow):
     def update_robot_position(self):
         for robot in self.robots:
             robot_name = robot['name']
-            if self.node.current_pose[robot_name]:
-                x = self.node.current_pose[robot_name].position.x
-                y = self.node.current_pose[robot_name].position.y
+            if self.robot_control_node.current_pose[robot_name]:
+                x = self.robot_control_node.current_pose[robot_name].position.x
+                y = self.robot_control_node.current_pose[robot_name].position.y
                 self.update_robot_position_on_map(x, y, robot_name)
 
     def update_robot_position_on_map(self, x, y, robot_name):
@@ -284,7 +465,7 @@ class MapWindow(QMainWindow):
         # 실제 좌표를 픽셀 좌표로 변환 (map_origin을 기준으로 설정)
         pixel_x = (x - self.map_origin[0]) * self.map_scale * 0.5 + self.map_view.width() / 2
         pixel_y = (-y + self.map_origin[1]) * self.map_scale * 0.5 + self.map_view.height() / 2
-        self.node.get_logger().debug(f"로봇 {robot_name} 픽셀 좌표: x={pixel_x}, y={pixel_y}")  # 디버깅용 로그 추가
+        self.robot_control_node.get_logger().debug(f"로봇 {robot_name} 픽셀 좌표: x={pixel_x}, y={pixel_y}")  # 디버깅용 로그 추가
 
         self.robot_items[robot_name].setPos(pixel_x, pixel_y)  # y축 반전
 
@@ -306,20 +487,13 @@ class RobotControlGUI(QWidget):
         # 이 예제에서는 더 이상 주문 큐나 이미지 신호가 필요 없으므로 생략
         pass
 
-def ros_spin(node):
-    rclpy.spin(node)
+def ros_spin(executor):
+    executor.spin()
 
 def main(args=None):
-    import sys  # 이미 상단에 있음
-    # Qt 플랫폼 플러그인 경로 설정 (필요에 따라 수정)
-    os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = '/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms'
-
-    # SHM Transport 비활성화 (필요시)
-    os.environ['RMW_IMPLEMENTATION'] = 'rmw_fastrtps_cpp'
-
     rclpy.init(args=args)
 
-    robot_queue = queue.Queue()
+    # ImageSignal 인스턴스 생성
     image_signal = ImageSignal()
 
     # Define robots with names and colors
@@ -328,14 +502,26 @@ def main(args=None):
         {'name': 'tb2', 'color': 'blue'},
     ]
 
-    node = RobotControlNode(robots, image_signal)
+    # RobotControlNode 인스턴스 생성
+    robot_control_node = RobotControlNode(robots, image_signal)
+
+    # ControlNode 인스턴스 생성
+    control_node = ControlNode()
+
+    # MultiThreadedExecutor 생성 및 노드 추가
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(robot_control_node)
+    executor.add_node(control_node)
 
     # ROS2 spinning을 별도 스레드에서 실행
-    ros_thread = threading.Thread(target=ros_spin, args=(node,), daemon=True)
+    ros_thread = threading.Thread(target=ros_spin, args=(executor,), daemon=True)
     ros_thread.start()
 
+    # Qt 플랫폼 플러그인 경로 설정 (필요에 따라 수정)
+    os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = '/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms'
+
     app = QApplication(sys.argv)
-    map_window = MapWindow(node, robots)
+    map_window = MapWindow(robot_control_node, robots)
     map_window.show()
 
     try:
@@ -343,7 +529,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
+        robot_control_node.destroy_node()
+        control_node.destroy_node()
         rclpy.shutdown()
         ros_thread.join()
 
