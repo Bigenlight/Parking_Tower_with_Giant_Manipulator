@@ -335,7 +335,7 @@ class RobotControlNode(Node):
             try:
                 # 압축된 ROS Image 메시지도 CvBridge로 변환 가능(encoding 유의)
                 # 여기서는 bgr8로 디코딩 시도
-                cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='bgr8')
+                cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
                 cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
                 height, width, channel = cv_image.shape
                 bytes_per_line = 3 * width
@@ -362,7 +362,7 @@ class MapWindow(QMainWindow):
         self.robots = robots
 
         self.setWindowTitle("로봇 제어 GUI")
-        self.setGeometry(100, 100, 1600, 800)
+        self.setGeometry(100, 100, 1481, 741)
 
         self.main_widget = QWidget()
         self.setCentralWidget(self.main_widget)
