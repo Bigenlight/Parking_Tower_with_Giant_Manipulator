@@ -20,13 +20,15 @@ class TestPublisher(Node):
             10
         )
 
-        # Start initial sequence
-        self.publish_tb1_arrived()
+        # Start initial sequence after 1 second
+        self.create_one_shot_timer(1.0, self.publish_tb1_arrived)
 
         # Variables for handling moving sequences
         self.moving_timer = None
         self.move_count = 0
         self.moving_type = None  # 'on_board' or 'empty'
+
+        self.get_logger().info('TestPublisher Node Initialized.')
 
     def publish_tb1_arrived(self):
         """Publish 'tb1 arrived' and schedule next step."""
