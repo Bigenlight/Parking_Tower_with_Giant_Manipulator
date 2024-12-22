@@ -3,6 +3,9 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Int32
 
+# 추가: QoSProfile, QoSReliabilityPolicy 등 임포트
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+
 
 class TestNode(Node):
     def __init__(self):
@@ -17,11 +20,17 @@ class TestNode(Node):
         # -----------------------
         #      Subscriber
         # -----------------------
+        # (1) QoS 설정: depth=1, reliability=BEST_EFFORT
+        qos_profile = QoSProfile(
+            depth=1,
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST
+        )
         self.destination_sub = self.create_subscription(
             Int32,
             '/destination',
             self.destination_callback,
-            10
+            qos_profile
         )
 
         # -----------------------
@@ -30,7 +39,6 @@ class TestNode(Node):
         self.move_in_progress = False    # 로봇팔이 현재 이동 중인지 여부
         self.current_move_type = None    # 'port_to_tower' 또는 'tower_to_port'
         self.moving_timer = None         # 이동 시뮬레이션용 타이머
-        self.move_count = 0             # 이동 시뮬레이션(초 단위) 누적
 
         self.get_logger().info('TestNode Initialized.')
 
@@ -72,7 +80,7 @@ class TestNode(Node):
         destination_value = msg.data
         self.get_logger().info(f'[TestNode] Received /destination: {destination_value}')
 
-        # 이미 이동 중이면 새로운 /destination 명령은 무시(또는 처리 로직 변경 가능)
+        # 이미 이동 중이면 새로운 /destination 명령은 무시
         if self.move_in_progress:
             self.get_logger().warn('로봇팔이 이미 이동 중입니다. 새 /destination 명령은 무시합니다.')
             return
@@ -97,34 +105,24 @@ class TestNode(Node):
         """
         self.move_in_progress = True
         self.current_move_type = move_type
-        self.move_count = 0
 
         self.get_logger().info(f'[TestNode] 로봇팔 이동 시작: {move_type}')
-        # 1초 단위로 move_in_progress를 표시
-        self.moving_timer = self.create_one_shot_timer(1.0, self.moving_timer_callback)
+        # 3초 후에 도착 메시지 퍼블리시
+        self.moving_timer = self.create_one_shot_timer(3.0, self.moving_timer_callback)
 
     def moving_timer_callback(self):
-        """1초마다 호출되어 총 3초 동안 이동 시뮬레이션"""
-        self.move_count += 1
-        self.get_logger().info(f'[TestNode] 로봇팔 이동 중... {self.move_count}초 경과')
-
-        if self.move_count < 3:
-            # 3초가 될 때까지 타이머를 재설정
-            self.moving_timer = self.create_one_shot_timer(1.0, self.moving_timer_callback)
+        """3초 후 호출되어 도착 메시지를 퍼블리시"""
+        if self.current_move_type == 'port_to_tower':
+            self.publish_tower_arrived()
+        elif self.current_move_type == 'tower_to_port':
+            self.publish_port_arrived()
         else:
-            # 3초가 지나면 도착 메시지(pub) 후 종료
-            if self.current_move_type == 'port_to_tower':
-                self.publish_tower_arrived()
-            elif self.current_move_type == 'tower_to_port':
-                self.publish_port_arrived()
-            else:
-                self.get_logger().warn(f'[TestNode] 알 수 없는 move_type: {self.current_move_type}')
+            self.get_logger().warn(f'[TestNode] 알 수 없는 move_type: {self.current_move_type}')
 
-            # 이동 상태 리셋
-            self.move_in_progress = False
-            self.current_move_type = None
-            self.moving_timer = None
-            self.move_count = 0
+        # 이동 상태 리셋
+        self.move_in_progress = False
+        self.current_move_type = None
+        self.moving_timer = None
 
     def publish_tower_arrived(self):
         """Publish 'tower arrived'."""
