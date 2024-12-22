@@ -127,7 +127,7 @@ class SkynetNode(Node):
 
             self.state = 'MOVE_TB_FORWARD'
             self.arm_busy = True  # 로봇팔에서 새 작업을 시작
-            self.move_turtlebot(self.current_tb, linear_x=0.3, duration=5)
+            self.move_turtlebot(self.current_tb, linear_x=2.0, duration=10)
 
     def move_turtlebot(self, tb: str, linear_x: float, duration: float):
         """
@@ -200,7 +200,7 @@ class SkynetNode(Node):
         if self.state == 'ARM_ON_BOARD':
             self.get_logger().info(f'[Skynet] (ARM_ON_BOARD) -> Move {self.current_tb} backward to unload.')
             self.state = 'MOVE_TB_BACKWARD'
-            self.move_turtlebot(self.current_tb, linear_x=-0.3, duration=5)
+            self.move_turtlebot(self.current_tb, linear_x=-2.0, duration=10)
 
     # -----------------------------------------------------------
     #   Main Loop
