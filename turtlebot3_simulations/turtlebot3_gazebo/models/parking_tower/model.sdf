@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<sdf version="1.5">
+  <model name="parking_tower">
+    <!-- Make the ramp static so it doesn't move upon collisions -->
+    <static>true</static>
+
+    <link name="parking_tower">
+      <!-- Optional: Set the initial pose of the ramp -->
+      <pose>141 0 32 0 0 -1.570796</pose>
+
+      <!-- Inertial properties are required even for static models -->
+      <inertial>
+        <mass>1.0</mass>
+        <inertia>
+          <ixx>1.0</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyy>1.0</iyy>
+          <iyz>0.0</iyz>
+          <izz>1.0</izz>
+        </inertia>
+      </inertial>
+
+      <!-- Collision element using the ramp mesh with scaling -->
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://parking_tower/meshes/parking_tower.dae</uri>
+            <scale>10.0 10.0 10.0</scale> <!-- Scale down by 50% -->
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <collide_bitmask>1</collide_bitmask>
+          </contact>
+          <friction>
+            <ode>
+              <mu>1.0</mu> <!-- Friction coefficient -->
+              <mu2>1.0</mu2>
+            </ode>
+          </friction>
+          <bounce>
+            <restitution_coefficient>0.0</restitution_coefficient>
+          </bounce>
+        </surface>
+      </collision>
+
+      <!-- Visual element using the ramp mesh with scaling and white material -->
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://parking_tower/meshes/parking_tower.dae</uri>
+            <scale>10.0 10.0 10.0</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://parking_tower/materials/scripts</uri>
+            <uri>model://parking_tower/materials/textures</uri>
+            <name>Table/Marble_Lightmap</name>
+          </script>
+          <lighting>true</lighting>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

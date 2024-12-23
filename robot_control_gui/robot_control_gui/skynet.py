@@ -190,7 +190,7 @@ class SkynetNode(Node):
                 self.map_window.disable_destination_buttons()
 
             # 실제 이동 시작
-            self.move_turtlebot(self.current_tb, linear_x=2.0, duration=10)
+            self.move_turtlebot(self.current_tb, linear_x=2.0, duration=20)
 
     def move_turtlebot(self, tb: str, linear_x: float, duration: float):
         """
@@ -276,7 +276,7 @@ class SkynetNode(Node):
         if self.state == 'ARM_ON_BOARD':
             self.get_logger().info(f'[Skynet] (ARM_ON_BOARD) -> Move {self.current_tb} backward to unload.')
             self.state = 'MOVE_TB_BACKWARD'
-            self.move_turtlebot(self.current_tb, linear_x=-2.0, duration=10)
+            self.move_turtlebot(self.current_tb, linear_x=-2.0, duration=5)
 
     def set_destination(self, new_dest: int):
         """
@@ -401,7 +401,7 @@ class MapWindow(QMainWindow):
         self.map_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # 실제 map.yaml 경로로 수정 필요
-        self.load_map("/home/rokey/7_ws/src/robot_control_gui/maps/map.yaml")
+        self.load_map("/home/theo/7_ws/src/robot_control_gui/maps/map.yaml")
 
         self.robot_items = {}
         for robot in self.robots:

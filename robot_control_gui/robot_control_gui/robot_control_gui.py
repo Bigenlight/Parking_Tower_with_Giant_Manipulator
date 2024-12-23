@@ -169,7 +169,7 @@ class MapWindow(QMainWindow):
         self.map_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)    # 세로 스크롤바 제거
 
         # 지도 로드 (map.yaml과 map.pgm 사용)
-        self.load_map("/home/rokey/7_ws/src/robot_control_gui/maps/map.yaml")  # 실제 지도 yaml 경로로 변경
+        self.load_map("/home/theo/7_ws/src/robot_control_gui/maps/map.yaml")  # 실제 지도 yaml 경로로 변경
 
         # 로봇 아이콘 추가 (원 형태)
         self.robot_item = self.map_scene.addEllipse(-5, -5, 10, 10, QPen(Qt.red), QBrush(Qt.red))

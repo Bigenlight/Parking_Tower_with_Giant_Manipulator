@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+
+<robot name="arduinobot" xmlns:xacro="http://www.ros.org/wiki.xacro">
+
+    <xacro:property name="PI" value= "3.14159"/>
+    <xacro:property name="effort" value= "30.0"/>
+    <xacro:property name="velocity" value= "10.0"/>
+    
+    <!-- 로스2 제어 태그-->
+    <ros2_control name="RobotSystem" type="system">
+        <hardware>
+            <!--가제보 하드웨어 플러그인-->
+            <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+        </hardware>
+
+        <joint name="joint_1">
+            <!-- 하드웨어 명령 보내는 태그-->
+            <command_interface name="position">
+                <!--파라미터, 최대 90, 최소 -90, 두배로 늘리기-->
+                <param name="max">${2*PI}</param>
+                <param name="min">-${2*PI}</param>
+            </command_interface>
+            <!--하드웨어에서 명령 읽기-->
+            <state_interface name="position"/>
+        </joint>
+
+        <joint name="joint_2">
+            <!-- 하드웨어 명령 보내는 태그-->
+            <command_interface name="position">
+                <param name="max">${PI}</param>
+                <param name="min">-${PI}</param>
+            </command_interface>
+            <!--하드웨어에서 명령 읽기-->
+            <state_interface name="position"/>
+        </joint>
+
+        <joint name="joint_3">
+            <!-- 하드웨어 명령 보내는 태그-->
+            <command_interface name="position">
+                <param name="max">${PI}</param>
+                <param name="min">-${PI}</param>
+            </command_interface>
+            <!--하드웨어에서 명령 읽기-->
+            <state_interface name="position"/>
+        </joint>
+
+        <joint name="joint_4">
+            <!-- 하드웨어 명령 보내는 태그-->
+            <command_interface name="position">
+                <param name="max">${PI}</param>
+                <param name="min">-${PI}</param>
+            </command_interface>
+            <!--하드웨어에서 명령 읽기-->
+            <state_interface name="position"/>
+        </joint>
+
+        <joint name="joint_5">
+            <!-- 하드웨어 명령 보내는 태그-->
+            <command_interface name="position">
+                <param name="max">${PI}</param>
+                <param name="min">-${PI}</param>
+            </command_interface>
+            <!--하드웨어에서 명령 읽기-->
+            <state_interface name="position"/>
+        </joint>
+
+        <joint name="joint_6">
+            <!-- 하드웨어 명령 보내는 태그-->
+            <command_interface name="position">
+                <param name="max">${PI}</param>
+                <param name="min">-${PI}</param>
+            </command_interface>
+            <!--하드웨어에서 명령 읽기-->
+            <state_interface name="position"/>
+        </joint>
+        
+
+    </ros2_control>
+
+
+</robot> 
