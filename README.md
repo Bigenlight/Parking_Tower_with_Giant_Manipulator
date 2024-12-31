@@ -1,4 +1,4 @@
-# BreadcrumbsParking Tower with Giant Manipulator in Gazebo
+# Parking Tower with Giant Manipulator in Gazebo
 
 [![Watch the video](https://img.youtube.com/vi/dKJbpoVkZgE/0.jpg)](https://www.youtube.com/watch?v=dKJbpoVkZgE)
 
